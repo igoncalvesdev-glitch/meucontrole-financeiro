@@ -1,1 +1,167 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Planilha Financeira</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1100px;
+            margin: 25px auto;
+            padding: 0 15px;
+            background: #f4f6f8;
+            color: #222;
+        }
+        h1 { text-align: center; }
+        .painel, form, .resumo {
+            background: white;
+            padding: 18px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+        }
+        .campos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        label { display: block; margin-bottom: 5px; }
+        input, select, button {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        button {
+            border: 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .salvar { background: #12ac61; color: white; }
+        .excluir { background: #b81509; color: white; }
+        .limpar { background: #3b0d0d; color: white; }
+        .tabela { overflow-x: auto; background: white; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        th, td { padding: 11px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background: #e9eef2; }
+        .resumo {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        .numero { font-size: 20px; font-weight: bold; }
+        .aviso { color: #b42318; font-weight: bold; }
+        .acoes { max-width: 120px; }
+        .acoes button { margin: 0; }
+        .linha-limpar { max-width: 420px; }
+    </style>
+</head>
+<body>
+    <h1>Minha Planilha Financeira</h1>
+    <p>
+        Período: {{ data_inicial[8:10] }}/{{ data_inicial[5:7] }}/{{ data_inicial[0:4] }}
+        até {{ data_final[8:10] }}/{{ data_final[5:7] }}/{{ data_final[0:4] }}
+    </p>
+
+    {% if erro %}
+        <p class="aviso">{{ erro }}</p>
+    {% endif %}
+
+    <form method="POST">
+        <h2>Novo lançamento</h2>
+        <div class="campos">
+            <div>
+                <label for="data">Data</label>
+                <input id="data" type="date" name="data"
+                       min="{{ data_inicial }}" max="{{ data_final }}"
+                       value="{{ data_inicial }}" required>
+            </div>
+            <div>
+                <label for="descricao">Descrição</label>
+                <input id="descricao" name="descricao"
+                       placeholder="Ex.: salário ou mercado" required>
+            </div>
+            <div>
+                <label for="tipo">Tipo</label>
+                <select id="tipo" name="tipo" required>
+                    <option value="Ganho">Ganho</option>
+                    <option value="Gasto">Gasto</option>
+                    <option value="Combustível">Combustível</option>
+                </select>
+            </div>
+            <div>
+                <label for="categoria">Categoria (opcional)</label>
+                <input id="categoria" name="categoria"
+                       placeholder="Ex.: trabalho">
+            </div>
+            <div>
+                <label for="valor">Valor em R$</label>
+                <input id="valor" type="number" name="valor"
+                       min="0.01" step="0.01" placeholder="0,00" required>
+            </div>
+        </div>
+        <button class="salvar" type="submit">Salvar lançamento</button>
+    </form>
+
+    <div class="resumo">
+        <div>Ganhos<div class="numero">R$ {{ "%.2f"|format(ganhos) }}</div></div>
+        <div>Gastos<div class="numero">R$ {{ "%.2f"|format(gastos) }}</div></div>
+        <div>Combustível<div class="numero">R$ {{ "%.2f"|format(combustivel) }}</div></div>
+        <div>Total de gastos<div class="numero">R$ {{ "%.2f"|format(total_gastos) }}</div></div>
+        <div>Saldo<div class="numero">R$ {{ "%.2f"|format(saldo) }}</div></div>
+    </div>
+
+    <h2>Lançamentos registrados</h2>
+    <div class="tabela">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Descrição</th>
+                    <th>Tipo</th>
+                    <th>Categoria</th>
+                    <th>Valor</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in lancamentos %}
+                <tr>
+                    <td>{{ item.data[8:10] }}/{{ item.data[5:7] }}/{{ item.data[0:4] }}</td>
+                    <td>{{ item.descricao }}</td>
+                    <td>{{ item.tipo }}</td>
+                    <td>{{ item.categoria or "-" }}</td>
+                    <td>R$ {{ "%.2f"|format(item.valor) }}</td>
+                    <td class="acoes">
+                        <form method="POST"
+                              action="{{ url_for('excluir', id=item.id) }}"
+                              onsubmit="return confirm('Tem certeza que deseja excluir este lançamento?');">
+                            <button class="excluir" type="submit">Excluir</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6">Nenhum lançamento neste período.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="painel">
+        <h2>Limpar todos os lançamentos</h2>
+        <p>Esta ação apaga todos os registros do banco de dados e não pode ser desfeita.</p>
+        <form class="linha-limpar" method="POST" action="{{ url_for('limpar_tudo') }}"
+              onsubmit="return confirm('ATENÇÃO: isso apagará TODOS os lançamentos. Deseja continuar?');">
+            <label for="confirmacao">Digite SIM para confirmar</label>
+            <input id="confirmacao" name="confirmacao"
+                   placeholder="Digite SIM" required>
+            <button class="limpar" type="submit">Apagar todos os lançamentos</button>
+        </form>
+    </div>
+</body>
+</html>
+
