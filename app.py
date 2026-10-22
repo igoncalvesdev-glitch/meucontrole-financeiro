@@ -1,38 +1,97 @@
+import os
+import time
+from datetime import date, timedelta
+from functools import wraps
 
-from flask import Flask, render_template, request, redirect, url_for
-import sqlite3
-from pathlib import Path
-from datetime import date
+from flask import (
+    Flask, g, redirect, render_template, request, session, url_for
+)
+from supabase import create_client
+
+try:
+    from dotenv import load_dotenv  # só para testar no computador (.env)
+    load_dotenv()
+except ImportError:
+    pass
 
 app = Flask(__name__)
+app.secret_key = os.environ["FLASK_SECRET_KEY"]
+app.permanent_session_lifetime = timedelta(days=30)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=bool(os.environ.get("RENDER")),  # True no Render (https)
+)
 
-DB_PATH = Path(__file__).resolve().parent / "financeiro.db"
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]  # só a chave anon, nunca a service_role
 
 DATA_INICIAL = "2026-10-20"
 DATA_FINAL = "2026-12-31"
 
 
-def conectar():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# ---------- Login e sessão ----------
+
+def guardar_sessao(res):
+    s = res.session
+    session.permanent = True
+    session["access_token"] = s.access_token
+    session["refresh_token"] = s.refresh_token
+    session["expires_at"] = s.expires_at
+    session["user_id"] = res.user.id
+    session["email"] = res.user.email
 
 
-def criar_tabela():
-    with conectar() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS lancamentos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data TEXT NOT NULL,
-                descricao TEXT NOT NULL,
-                tipo TEXT NOT NULL,
-                categoria TEXT,
-                valor REAL NOT NULL
-            )
-        """)
+def cliente_do_usuario():
+    """Cliente do Supabase que age com a identidade de quem está logado (RLS)."""
+    c = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    if time.time() > session.get("expires_at", 0) - 60:
+        guardar_sessao(c.auth.refresh_session(session["refresh_token"]))
+    c.postgrest.auth(session["access_token"])
+    return c
 
+
+def login_obrigatorio(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "access_token" not in session:
+            return redirect(url_for("login"))
+        try:
+            g.db = cliente_do_usuario()
+        except Exception:
+            session.clear()
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    erro = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        senha = request.form.get("senha", "")
+        try:
+            c = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+            res = c.auth.sign_in_with_password({"email": email, "password": senha})
+            guardar_sessao(res)
+            return redirect(url_for("index"))
+        except Exception as e:
+            print("ERRO LOGIN:", e)
+            erro = "E-mail ou senha incorretos."
+    return render_template("login.html", erro=erro)
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+# ---------- App ----------
 
 @app.route("/", methods=["GET", "POST"])
+@login_obrigatorio
 def index():
     erro = None
 
@@ -59,37 +118,36 @@ def index():
             if valor <= 0:
                 raise ValueError("O valor precisa ser maior que zero.")
 
-            with conectar() as conn:
-                conn.execute("""
-                    INSERT INTO lancamentos
-                    (data, descricao, tipo, categoria, valor)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (data_obj.isoformat(), descricao, tipo, categoria, valor))
+            g.db.table("lancamentos").insert({
+                "user_id": session["user_id"],
+                "data": data_obj.isoformat(),
+                "descricao": descricao,
+                "tipo": tipo,
+                "categoria": categoria,
+                "valor": valor,
+            }).execute()
 
             return redirect(url_for("index"))
 
         except (ValueError, TypeError):
             erro = "Confira a data, o tipo e o valor. Use um valor maior que zero."
+        except Exception:
+            erro = "Não foi possível salvar agora. Tente novamente."
 
-    with conectar() as conn:
-        lancamentos = conn.execute("""
-            SELECT * FROM lancamentos
-            WHERE data >= ? AND data <= ?
-            ORDER BY data DESC, id DESC
-        """, (DATA_INICIAL, DATA_FINAL)).fetchall()
+    lancamentos = (
+        g.db.table("lancamentos")
+        .select("*")
+        .gte("data", DATA_INICIAL)
+        .lte("data", DATA_FINAL)
+        .order("data", desc=True)
+        .order("id", desc=True)
+        .execute()
+        .data
+    )
 
-    ganhos = sum(
-        item["valor"] for item in lancamentos
-        if item["tipo"] == "Ganho"
-    )
-    gastos = sum(
-        item["valor"] for item in lancamentos
-        if item["tipo"] == "Gasto"
-    )
-    combustivel = sum(
-        item["valor"] for item in lancamentos
-        if item["tipo"] == "Combustível"
-    )
+    ganhos = sum(i["valor"] for i in lancamentos if i["tipo"] == "Ganho")
+    gastos = sum(i["valor"] for i in lancamentos if i["tipo"] == "Gasto")
+    combustivel = sum(i["valor"] for i in lancamentos if i["tipo"] == "Combustível")
     total_gastos = gastos + combustivel
     saldo = ganhos - total_gastos
 
@@ -103,29 +161,26 @@ def index():
         saldo=saldo,
         erro=erro,
         data_inicial=DATA_INICIAL,
-        data_final=DATA_FINAL
+        data_final=DATA_FINAL,
+        email=session.get("email"),
     )
 
 
 @app.route("/excluir/<int:id>", methods=["POST"])
+@login_obrigatorio
 def excluir(id):
-    with conectar() as conn:
-        conn.execute("DELETE FROM lancamentos WHERE id = ?", (id,))
+    g.db.table("lancamentos").delete().eq("id", id).execute()
     return redirect(url_for("index"))
 
 
 @app.route("/limpar-tudo", methods=["POST"])
+@login_obrigatorio
 def limpar_tudo():
-    confirmacao = request.form.get("confirmacao")
-
-    if confirmacao == "SIM":
-        with conectar() as conn:
-            conn.execute("DELETE FROM lancamentos")
-
+    if request.form.get("confirmacao") == "SIM":
+        # apaga só os lançamentos de quem está logado
+        g.db.table("lancamentos").delete().eq("user_id", session["user_id"]).execute()
     return redirect(url_for("index"))
 
-
-criar_tabela()
 
 if __name__ == "__main__":
     app.run(debug=True)

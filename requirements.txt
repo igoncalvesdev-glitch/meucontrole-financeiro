@@ -1,4 +1,4 @@
-
-Flask
+flask
+supabase
 gunicorn
-psycopg[binary]
+python-dotenv
