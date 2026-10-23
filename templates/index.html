@@ -1,168 +1,235 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minha Planilha Financeira</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1100px;
-            margin: 25px auto;
-            padding: 0 15px;
-            background: #f4f6f8;
-            color: #222;
-        }
-        h1 { text-align: center; }
-        .painel, form, .resumo {
-            background: white;
-            padding: 18px;
-            border-radius: 10px;
-            margin-bottom: 18px;
-        }
-        .campos {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-        }
-        label { display: block; margin-bottom: 5px; }
-        input, select, button {
-            box-sizing: border-box;
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        button {
-            border: 0;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .salvar { background: #12ac61; color: white; }
-        .excluir { background: #b81509; color: white; }
-        .limpar { background: #3b0d0d; color: white; }
-        .tabela { overflow-x: auto; background: white; border-radius: 10px; }
-        table { width: 100%; border-collapse: collapse; min-width: 700px; }
-        th, td { padding: 11px; border-bottom: 1px solid #ddd; text-align: left; }
-        th { background: #e9eef2; }
-        .resumo {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 12px;
-        }
-        .numero { font-size: 20px; font-weight: bold; }
-        .aviso { color: #b42318; font-weight: bold; }
-        .acoes { max-width: 120px; }
-        .acoes button { margin: 0; }
-        .linha-limpar { max-width: 420px; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minha Planilha Financeira</title>
+<style>
+:root{
+  --bg:#0a0f2c; --card:#131a44; --borda:#2a3370; --texto:#ffffff; --suave:#9fb0d9;
+  --ciano:#00e5ff; --rosa:#ff1a75; --roxo:#a020f0; --verde:#39ff14;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:var(--bg);color:var(--texto);font-family:"Segoe UI",Roboto,Arial,sans-serif;max-width:720px;margin-inline:auto}
+h1{font-size:1.4rem;margin:0}
+h2{font-size:1.05rem;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:16px;margin-bottom:14px}
+.topo{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.user{display:flex;align-items:center;gap:10px}
+.avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--borda);display:flex;align-items:center;justify-content:center;font-weight:bold;border:2px solid var(--ciano)}
+.user small{color:var(--suave);display:block}
+label{display:block;font-size:.85rem;color:var(--suave);margin-bottom:4px}
+input,select,button{font:inherit}
+input,select{width:100%;padding:10px;background:var(--bg);color:var(--texto);border:1px solid var(--borda);border-radius:8px}
+input::placeholder{color:var(--suave)}
+input:focus,select:focus{outline:2px solid var(--ciano);outline-offset:1px}
+.grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cheio{grid-column:1/-1}
+.btn{width:100%;padding:12px;border:none;border-radius:8px;background:var(--ciano);color:var(--bg);font-weight:bold;cursor:pointer}
+.btn-sec{background:transparent;color:var(--suave);border:1px solid var(--borda);padding:8px 12px;width:auto;font-weight:normal}
+.btn-perigo{background:var(--rosa);color:#fff}
+.kpi{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:12px;text-align:center;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--cor)}
+.kpi small{display:block;color:var(--suave);font-size:.8rem;margin-bottom:4px}
+.kpi b{font-size:1.25rem}
+.alerta{background:#3a1030;border:1px solid var(--rosa);color:#ffd0e2;border-radius:10px;padding:10px;margin-bottom:14px}
+.leg{display:flex;gap:14px;font-size:.8rem;color:var(--suave);margin-bottom:6px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+.graf{position:relative;height:220px}
+.item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--borda)}
+.item:last-child{border-bottom:none}
+.ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex:none}
+.info{flex:1;min-width:0}
+.info b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.info small{color:var(--suave)}
+.val{font-weight:bold;white-space:nowrap}
+.x{background:none;border:none;color:var(--suave);cursor:pointer;font-size:1.1rem;padding:4px 8px}
+.vazio{color:var(--suave);text-align:center;padding:16px 0}
+</style>
 </head>
 <body>
-    <h1>Minha Planilha Financeira</h1>
-    <p>
-        Período: {{ data_inicial[8:10] }}/{{ data_inicial[5:7] }}/{{ data_inicial[0:4] }}
-        até {{ data_final[8:10] }}/{{ data_final[5:7] }}/{{ data_final[0:4] }}
-    </p>
 
-    {% if erro %}
-        <p class="aviso">{{ erro }}</p>
+<div class="topo">
+  <div class="user">
+    {% if perfil.foto %}
+      <img class="avatar" src="{{ url_for('static', filename=perfil.foto) }}" alt="Foto de {{ perfil.nome }}">
+    {% else %}
+      <div class="avatar">{{ perfil.nome[:1] }}</div>
     {% endif %}
+    <div><small>Olá,</small><b>{{ perfil.nome }}</b></div>
+  </div>
+  <form method="post" action="{{ url_for('logout') }}">
+    <button class="btn btn-sec" type="submit">Sair</button>
+  </form>
+</div>
 
-    <form method="POST">
-        <h2>Novo lançamento</h2>
-        <div class="campos">
-            <div>
-                <label for="data">Data</label>
-                <input id="data" type="date" name="data"
-                       min="{{ data_inicial }}" max="{{ data_final }}"
-                       value="{{ data_inicial }}" required>
-            </div>
-            <div>
-                <label for="descricao">Descrição</label>
-                <input id="descricao" name="descricao"
-                       placeholder="Ex.: salário ou mercado" required>
-            </div>
-            <div>
-                <label for="tipo">Tipo</label>
-                <select id="tipo" name="tipo" required>
-                    <option value="Ganho">Ganho</option>
-                    <option value="Gasto">Gasto</option>
-                    <option value="Combustível">Combustível</option>
-                </select>
-            </div>
-            <div>
-                <label for="categoria">Categoria (opcional)</label>
-                <input id="categoria" name="categoria"
-                       placeholder="Ex.: trabalho">
-            </div>
-            <div>
-                <label for="valor">Valor em R$</label>
-                <input id="valor" type="number" name="valor"
-                       min="0.01" step="0.01" placeholder="0,00" required>
-            </div>
-        </div>
-        <button class="salvar" type="submit">Salvar lançamento</button>
-    </form>
+<h1 style="margin-bottom:12px">Minha Planilha Financeira</h1>
 
-    <div class="resumo">
-        <div>Ganhos<div class="numero">R$ {{ "%.2f"|format(ganhos) }}</div></div>
-        <div>Gastos<div class="numero">R$ {{ "%.2f"|format(gastos) }}</div></div>
-        <div>Combustível<div class="numero">R$ {{ "%.2f"|format(combustivel) }}</div></div>
-        <div>Total de gastos<div class="numero">R$ {{ "%.2f"|format(total_gastos) }}</div></div>
-        <div>Saldo<div class="numero">R$ {{ "%.2f"|format(saldo) }}</div></div>
+{% if erro %}<div class="alerta">{{ erro }}</div>{% endif %}
+
+<div class="card">
+  <div class="grade">
+    <div><label for="f-ano">Ano</label><select id="f-ano"></select></div>
+    <div><label for="f-mes">Mês</label><select id="f-mes"></select></div>
+  </div>
+</div>
+
+<div class="grade" style="margin-bottom:14px">
+  <div class="kpi" style="--cor:var(--ciano)"><small>Ganhos</small><b id="k-ganhos">R$ 0,00</b></div>
+  <div class="kpi" style="--cor:var(--rosa)"><small>Gastos</small><b id="k-gastos">R$ 0,00</b></div>
+  <div class="kpi" style="--cor:var(--roxo)"><small>Combustível</small><b id="k-comb">R$ 0,00</b></div>
+  <div class="kpi" style="--cor:var(--rosa)"><small>Total de gastos</small><b id="k-total">R$ 0,00</b></div>
+  <div class="kpi cheio" style="--cor:var(--verde)"><small>Saldo</small><b id="k-saldo" style="color:var(--verde)">R$ 0,00</b></div>
+</div>
+
+<div class="card">
+  <h2>Novo lançamento</h2>
+  <form method="post" action="{{ url_for('index') }}">
+    <div class="grade">
+      <div><label for="data">Data</label><input id="data" type="date" name="data" value="{{ hoje }}" required></div>
+      <div><label for="descricao">Descrição</label><input id="descricao" name="descricao" placeholder="Salário ou mercado" required></div>
+      <div><label for="categoria">Categoria</label>
+        <select id="categoria" name="categoria">
+          {% for nome, c in categorias.items() %}<option value="{{ nome }}" data-tipo="{{ c.tipo }}">{{ c.icone }} {{ nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div><label for="tipo">Tipo</label>
+        <select id="tipo" name="tipo">
+          <option>Ganho</option><option>Gasto</option><option>Combustível</option>
+        </select>
+      </div>
+      <div class="cheio"><label for="valor">Valor em R$</label><input id="valor" name="valor" inputmode="decimal" placeholder="0,00" required></div>
+      <div class="cheio"><button class="btn" type="submit">Salvar lançamento</button></div>
     </div>
+  </form>
+</div>
 
-    <h2>Lançamentos registrados</h2>
-    <div class="tabela">
-        <table>
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Descrição</th>
-                    <th>Tipo</th>
-                    <th>Categoria</th>
-                    <th>Valor</th>
-                    <th>Ação</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in lancamentos %}
-                <tr>
-                    <td>{{ item.data[8:10] }}/{{ item.data[5:7] }}/{{ item.data[0:4] }}</td>
-                    <td>{{ item.descricao }}</td>
-                    <td>{{ item.tipo }}</td>
-                    <td>{{ item.categoria or "-" }}</td>
-                    <td>R$ {{ "%.2f"|format(item.valor) }}</td>
-                    <td class="acoes">
-                        <form method="POST"
-                              action="{{ url_for('excluir', id=item.id) }}"
-                              onsubmit="return confirm('Tem certeza que deseja excluir este lançamento?');">
-                            <button class="excluir" type="submit">Excluir</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6">Nenhum lançamento neste período.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="card">
+  <h2>Ganhos x gastos</h2>
+  <div class="leg"><span><i style="background:var(--ciano)"></i>Ganhos</span><span><i style="background:var(--rosa)"></i>Gastos</span></div>
+  <div class="graf"><canvas id="rosca" role="img" aria-label="Rosca de ganhos contra gastos"></canvas></div>
+</div>
 
-    <div class="painel">
-        <h2>Limpar todos os lançamentos</h2>
-        <p>Esta ação apaga todos os registros do banco de dados e não pode ser desfeita.</p>
-        <form class="linha-limpar" method="POST" action="{{ url_for('limpar_tudo') }}"
-              onsubmit="return confirm('ATENÇÃO: isso apagará TODOS os lançamentos. Deseja continuar?');">
-            <label for="confirmacao">Digite SIM para confirmar</label>
-            <input id="confirmacao" name="confirmacao"
-                   placeholder="Digite SIM" required>
-            <button class="limpar" type="submit">Apagar todos os lançamentos</button>
-        </form>
-    </div>
+<div class="card">
+  <h2>Entrada x saída</h2>
+  <div class="leg"><span><i style="background:var(--ciano)"></i>Entrada</span><span><i style="background:var(--rosa)"></i>Saída</span></div>
+  <div class="graf"><canvas id="linha" role="img" aria-label="Linhas de entrada e saída por período"></canvas></div>
+</div>
+
+<div class="card">
+  <h2>Lançamentos registrados</h2>
+  <div id="lista"></div>
+</div>
+
+<div class="card">
+  <h2>Limpar todos os lançamentos</h2>
+  <p style="color:var(--suave);margin-top:0">Apaga todos os seus registros. Esta ação não pode ser desfeita.</p>
+  <form method="post" action="{{ url_for('limpar_tudo') }}">
+    <label for="conf">Digite SIM para confirmar</label>
+    <input id="conf" name="confirmacao" autocomplete="off" style="margin-bottom:10px">
+    <button class="btn btn-perigo" type="submit">Apagar tudo</button>
+  </form>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const LANC = {{ lancamentos|tojson }};
+const CATS = {{ categorias|tojson }};
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const COR = {Ganho:'#00e5ff', Gasto:'#ff1a75', 'Combustível':'#a020f0'};
+const brl = v => Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const selAno = document.getElementById('f-ano');
+const selMes = document.getElementById('f-mes');
+
+const anos = new Set([new Date().getFullYear()]);
+LANC.forEach(l => anos.add(Number(l.data.slice(0,4))));
+selAno.innerHTML = '<option value="">Todos os anos</option>' +
+  [...anos].sort((a,b)=>b-a).map(a => `<option value="${a}">${a}</option>`).join('');
+selMes.innerHTML = '<option value="">Todos os meses</option>' +
+  MESES.map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
+
+const catSel = document.getElementById('categoria');
+const tipoSel = document.getElementById('tipo');
+function sincronizarTipo(){ tipoSel.value = catSel.selectedOptions[0].dataset.tipo; }
+catSel.addEventListener('change', sincronizarTipo);
+sincronizarTipo();
+
+const tick = '#9fb0d9', grade = 'rgba(159,176,217,0.15)';
+const rosca = new Chart(document.getElementById('rosca'), {
+  type:'doughnut',
+  data:{labels:['Ganhos','Gastos'],datasets:[{data:[0,0],backgroundColor:['#00e5ff','#ff1a75'],borderWidth:2,borderColor:'#131a44'}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+brl(c.parsed)}}}}
+});
+const linha = new Chart(document.getElementById('linha'), {
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'Entrada',data:[],borderColor:'#00e5ff',backgroundColor:'#00e5ff',borderWidth:2,pointRadius:3,tension:.3},
+    {label:'Saída',data:[],borderColor:'#ff1a75',backgroundColor:'#ff1a75',borderWidth:2,borderDash:[5,4],pointStyle:'rect',pointRadius:3,tension:.3}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+brl(c.parsed.y)}}},
+    scales:{x:{grid:{display:false},ticks:{color:tick}},y:{grid:{color:grade},ticks:{color:tick}}}}
+});
+
+function atualizar(){
+  const ano = selAno.value, mes = selMes.value;
+  const f = LANC.filter(l =>
+    (!ano || l.data.slice(0,4) === ano) &&
+    (!mes || Number(l.data.slice(5,7)) === Number(mes))
+  );
+  const soma = t => f.filter(l => l.tipo === t).reduce((s,l) => s + Number(l.valor), 0);
+  const ganhos = soma('Ganho'), gastos = soma('Gasto'), comb = soma('Combustível');
+  const total = gastos + comb;
+
+  document.getElementById('k-ganhos').textContent = brl(ganhos);
+  document.getElementById('k-gastos').textContent = brl(gastos);
+  document.getElementById('k-comb').textContent = brl(comb);
+  document.getElementById('k-total').textContent = brl(total);
+  const saldoEl = document.getElementById('k-saldo');
+  saldoEl.textContent = brl(ganhos - total);
+  saldoEl.style.color = ganhos - total < 0 ? '#ff1a75' : '#39ff14';
+
+  rosca.data.datasets[0].data = [ganhos, total];
+  rosca.update();
+
+  let rotulos, ent, sai;
+  if (ano) {
+    rotulos = MESES.map(m => m.slice(0,3));
+    ent = Array(12).fill(0); sai = Array(12).fill(0);
+    f.forEach(l => { const i = Number(l.data.slice(5,7)) - 1;
+      if (l.tipo === 'Ganho') ent[i] += Number(l.valor); else sai[i] += Number(l.valor); });
+  } else {
+    const ys = [...new Set(f.map(l => l.data.slice(0,4)))].sort();
+    rotulos = ys; ent = ys.map(() => 0); sai = ys.map(() => 0);
+    f.forEach(l => { const i = ys.indexOf(l.data.slice(0,4));
+      if (l.tipo === 'Ganho') ent[i] += Number(l.valor); else sai[i] += Number(l.valor); });
+  }
+  linha.data.labels = rotulos;
+  linha.data.datasets[0].data = ent;
+  linha.data.datasets[1].data = sai;
+  linha.update();
+
+  const lista = document.getElementById('lista');
+  if (!f.length) { lista.innerHTML = '<div class="vazio">Nenhum lançamento neste período.</div>'; return; }
+  lista.innerHTML = f.map(l => {
+    const c = CATS[l.categoria] || CATS['Outros'];
+    const sinal = l.tipo === 'Ganho' ? '+' : '-';
+    const [a,m,d] = l.data.split('-');
+    return `<div class="item">
+      <div class="ico" style="background:${c.cor}33">${c.icone}</div>
+      <div class="info"><b>${esc(l.descricao)}</b><small>${esc(l.categoria)} · ${d}/${m}/${a}</small></div>
+      <div class="val" style="color:${COR[l.tipo] || '#fff'}">${sinal} ${brl(l.valor)}</div>
+      <form method="post" action="/excluir/${Number(l.id)}" onsubmit="return confirm('Excluir este lançamento?')">
+        <button class="x" type="submit" aria-label="Excluir lançamento">✕</button>
+      </form>
+    </div>`;
+  }).join('');
+}
+
+selAno.addEventListener('change', atualizar);
+selMes.addEventListener('change', atualizar);
+atualizar();
+</script>
 </body>
 </html>
-<form method="post" action="{{ url_for('logout') }}">
-  <button type="submit">Sair</button>
-</form>
