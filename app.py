@@ -26,8 +26,36 @@ app.config.update(
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]  # só a chave anon, nunca a service_role
 
-DATA_INICIAL = "2026-10-20"
-DATA_FINAL = "2026-12-31"
+TIPOS = ("Ganho", "Gasto", "Combustível")
+
+# ---------- Perfis (nome e foto) ----------
+# TROQUE pelos e-mails que vocês usam para entrar (em letras minúsculas).
+# As fotos ficam na pasta static/ (ex.: static/igor.jpg).
+
+PERFIS = {
+    "i.goncalvesdev@gmail.com":  {"nome": "Igor",  "foto": None},
+    "drabrunahertzog@gmail.com":   {"nome": "Bruna", "foto": None},
+}
+
+# ---------- Categorias (ícone, cor e tipo padrão) ----------
+CATEGORIAS = {
+    "Salário":      {"icone": "⬇️", "cor": "#16a34a", "tipo": "Ganho"},
+    "Rendimento":   {"icone": "⬆️", "cor": "#16a34a", "tipo": "Ganho"},
+    "Supermercado": {"icone": "🛒", "cor": "#e91e63", "tipo": "Gasto"},
+    "Restaurante":  {"icone": "🍴", "cor": "#ef4444", "tipo": "Gasto"},
+    "Academia":     {"icone": "🏋️", "cor": "#7c3aed", "tipo": "Gasto"},
+    "Combustível":  {"icone": "⛽", "cor": "#8e24aa", "tipo": "Combustível"},
+    "Lazer":        {"icone": "💜", "cor": "#a855f7", "tipo": "Gasto"},
+    "Outros":       {"icone": "📦", "cor": "#64748b", "tipo": "Gasto"},
+}
+
+
+def perfil_atual():
+    email = (session.get("email") or "").lower()
+    if email in PERFIS:
+        return PERFIS[email]
+    nome = email.split("@")[0].capitalize() if email else "Usuário"
+    return {"nome": nome, "foto": None}
 
 
 # ---------- Login e sessão ----------
@@ -106,14 +134,14 @@ def index():
             data_obj = date.fromisoformat(data_lancamento)
             valor = float(valor_texto.replace(",", "."))
 
-            if not DATA_INICIAL <= data_lancamento <= DATA_FINAL:
-                raise ValueError("A data deve estar entre 20/10/2026 e 31/12/2026.")
-
             if not descricao:
                 raise ValueError("Preencha a descrição.")
 
-            if tipo not in ("Ganho", "Gasto", "Combustível"):
+            if tipo not in TIPOS:
                 raise ValueError("Selecione um tipo válido.")
+
+            if categoria not in CATEGORIAS:
+                categoria = "Outros"
 
             if valor <= 0:
                 raise ValueError("O valor precisa ser maior que zero.")
@@ -134,35 +162,24 @@ def index():
         except Exception:
             erro = "Não foi possível salvar agora. Tente novamente."
 
+    # Sem período fixo: traz todos os lançamentos (a RLS já filtra só os de quem está logado).
+    # Os totais, filtros de ano/mês e gráficos são calculados na página.
     lancamentos = (
         g.db.table("lancamentos")
         .select("*")
-        .gte("data", DATA_INICIAL)
-        .lte("data", DATA_FINAL)
         .order("data", desc=True)
         .order("id", desc=True)
         .execute()
         .data
     )
 
-    ganhos = sum(i["valor"] for i in lancamentos if i["tipo"] == "Ganho")
-    gastos = sum(i["valor"] for i in lancamentos if i["tipo"] == "Gasto")
-    combustivel = sum(i["valor"] for i in lancamentos if i["tipo"] == "Combustível")
-    total_gastos = gastos + combustivel
-    saldo = ganhos - total_gastos
-
     return render_template(
         "index.html",
         lancamentos=lancamentos,
-        ganhos=ganhos,
-        gastos=gastos,
-        combustivel=combustivel,
-        total_gastos=total_gastos,
-        saldo=saldo,
+        categorias=CATEGORIAS,
+        perfil=perfil_atual(),
+        hoje=date.today().isoformat(),
         erro=erro,
-        data_inicial=DATA_INICIAL,
-        data_final=DATA_FINAL,
-        email=session.get("email"),
     )
 
 
